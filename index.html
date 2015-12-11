@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Bookshelf</title>
+    </head>
+    <style>
+        @import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:200,600,200italic,600italic);
+        h1, h2, h3, h4, h5, h6 {
+            font-family: "Source Sans Pro", Helvetica, sans-serif;
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.4; }
+        h1 {
+            font-size: 5rem; }
+        h2 {
+            font-size: 3rem; }
+        h3 {
+            font-size: 2rem; }
+        h4 {
+            font-size: 1.5rem; }
+        h5 {
+            font-weight: 200;
+            font-size: 1.25rem;
+            line-height: 0.8rem; }
+        h6 {
+            font-size: 1rem; }
+        body, html {
+            position: fixed;
+            background-color: #D32F2F;
+            width: 100%;
+            height: 100%;
+            font-family: "Source Sans Pro", Helvetica, sans-serif;
+            font-size: 16px;
+            text-align: center;
+            color: #222222; }
+        a, a:hover {
+            color: #ffffff;
+            text-decoration: none; }
+        ul {
+            color: #ffffff;
+        }
+        ul > * {
+            vertical-align: middle; }
+    </style>
+    <body>
+        <h1>Bookshelf</h1>
+        <ul>
+            Flash Boys: A Wall Street Revolt by Michael Lewis<br>
+            Liar's Poker by Michael Lewis<br>
+            Moneyball: The Art of Winning an Unfair Game by Michael Lewis<br>
+            Next: The Future Just Happened by Michael Lewis<br>
+            The New New Thing by Michael Lewis<br>
+            Classic Readings and Cases in the Philosophy of Law by Susan Dimock<br>
+            The Philosophy of Law (Oxford Readings in Philosophy) by Ronald Dworkin<br>
+        </ul>
+    </body>
+    <script src="//twemoji.maxcdn.com/twemoji.min.js"></script>
+    <script>
+        twemoji.parse(document.getElementsByTagName('ul')[0], {"size": 16});
+    </script>
+</html>
