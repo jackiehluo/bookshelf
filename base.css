@@ -45,5 +45,6 @@ a, a:active, a:hover, a:link, a:visited {
 
 li {
     list-style-type: none;
-    padding: 5px;
+    margin-left: -40px;
+    padding-top: 10px;
 }
