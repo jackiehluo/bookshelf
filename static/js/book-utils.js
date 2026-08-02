@@ -26,4 +26,7 @@ export const ratingMarkup = (rating) => {
   return `<span class="rating" aria-label="${rounded} out of 5 stars">${"●".repeat(rounded)}${"○".repeat(5 - rounded)}</span>`;
 };
 
-export const bookUrlFor = (book) => `book.html?id=${encodeURIComponent(book.id)}`;
+export const bookUrlFor = (book) => {
+  const page = window.location.protocol === "file:" ? "book/index.html" : "book/";
+  return `${page}?title=${encodeURIComponent(book.slug)}`;
+};

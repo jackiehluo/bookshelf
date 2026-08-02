@@ -4,7 +4,7 @@ A static, data-driven record of books read and highlights saved.
 
 ## Data
 
-`static/data/books.json` is the generated source archive. The public index reads the lightweight
+`_data/books.json` is the generated source archive and is excluded from the rendered site. The public index reads the lightweight
 `static/data/catalog.json`, and each book page loads its own file from `static/data/highlights/`.
 
 Import a full Goodreads library export once:
@@ -20,7 +20,7 @@ GOODREADS_RSS_URL="..." READWISE_TOKEN="..." node scripts/sync-books.mjs
 ```
 
 All matched Readwise highlights are published by the scheduled sync.
-Readwise Reader PDFs are considered too, even when Readwise categorizes them as articles. Translated or otherwise renamed Reader documents can be mapped to their Goodreads record in `static/data/readwise-matches.json`.
+Readwise Reader PDFs are considered too, even when Readwise categorizes them as articles. Translated or otherwise renamed Reader documents can be mapped to their Goodreads record in `_data/readwise-matches.json`.
 
 Books from the original hand-maintained site are retained without dates after the Goodreads history, including during a full CSV replacement.
 

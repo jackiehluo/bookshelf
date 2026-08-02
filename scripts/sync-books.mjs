@@ -3,10 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataPath = path.join(root, "static/data/books.json");
+const dataPath = path.join(root, "_data/books.json");
 const catalogPath = path.join(root, "static/data/catalog.json");
 const highlightsDirectory = path.join(root, "static/data/highlights");
-const readwiseMatchesPath = path.join(root, "static/data/readwise-matches.json");
+const readwiseMatchesPath = path.join(root, "_data/readwise-matches.json");
 
 export const decodeEntities = (value = "") =>
   String(value ?? "")
@@ -337,25 +337,32 @@ export const compactBooks = (books) => books.map(({ url: _url, ...book }) => ({
   highlights: (book.highlights || []).map(({ id, text }) => ({ id, text })),
 }));
 
-const publicFileKey = (id) =>
-  String(id)
+const shortPublicTitle = (title = "") =>
+  title.replace(/\s*\([^)]*\)\s*$/, "").split(":", 1)[0].trim();
+
+export const publicBookSlug = ({ title = "" }) =>
+  shortPublicTitle(title)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
 
 export const publicBookRecord = (book) => {
   const {
+    id: _id,
     highlights = [],
     identifiers: _identifiers,
     legacy,
     ...metadata
   } = book;
-  const fileKey = publicFileKey(book.id);
+  const slug = publicBookSlug(book);
   return {
     ...metadata,
+    slug,
     ...(legacy?.order != null ? { legacy: { order: legacy.order } } : {}),
     highlightCount: highlights.length,
-    highlightsPath: highlights.length ? `static/data/highlights/${fileKey}.json` : null,
+    highlightsPath: highlights.length ? `static/data/highlights/${slug}.json` : null,
   };
 };
 
@@ -374,16 +381,20 @@ const writeHighlightData = async (filePath, data) => {
 const writePublicData = async (books, updatedAt) => {
   await mkdir(highlightsDirectory, { recursive: true });
   const catalogBooks = books.map(publicBookRecord);
+  const slugs = new Set();
   const highlightFiles = new Map();
 
   books.forEach((book) => {
+    const slug = publicBookSlug(book);
+    if (!slug) throw new Error(`Could not create a public slug for ${book.title || "untitled book"}.`);
+    if (slugs.has(slug)) throw new Error(`Duplicate public book slug: ${slug}`);
+    slugs.add(slug);
     if (!book.highlights?.length) return;
-    const filename = `${publicFileKey(book.id)}.json`;
-    if (highlightFiles.has(filename)) throw new Error(`Duplicate public book key: ${filename}`);
+    const filename = `${slug}.json`;
     highlightFiles.set(filename, {
       schemaVersion: 1,
       updatedAt,
-      bookId: book.id,
+      book: slug,
       highlights: book.highlights.map(({ text }) => ({ text })),
     });
   });

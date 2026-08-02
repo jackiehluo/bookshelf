@@ -2,7 +2,7 @@ import {
   escapeHtml,
   formatDate,
   ratingMarkup,
-} from "./book-utils.js";
+} from "./book-utils.js?v=20260802-1";
 
 const CATALOG_URL = "static/data/catalog.json";
 const page = document.querySelector("#book-page");
@@ -82,13 +82,13 @@ const render = (book, highlights) => {
 };
 
 try {
-  const bookId = new URLSearchParams(window.location.search).get("id");
-  if (!bookId) throw new Error("No book was selected.");
+  const bookSlug = new URLSearchParams(window.location.search).get("title");
+  if (!bookSlug) throw new Error("No book was selected.");
 
   const catalogResponse = await fetch(CATALOG_URL, { cache: "no-store" });
   if (!catalogResponse.ok) throw new Error(`Could not load the bookshelf (${catalogResponse.status})`);
   const catalog = await catalogResponse.json();
-  const book = (catalog.books || []).find(({ id }) => id === bookId);
+  const book = (catalog.books || []).find(({ slug }) => slug === bookSlug);
   if (!book) throw new Error("This book isn’t on the shelf.");
 
   let highlights = [];
@@ -103,5 +103,5 @@ try {
   render(book, highlights);
 } catch (error) {
   page.setAttribute("aria-busy", "false");
-  page.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}<br><a href="index.html">Back to the bookshelf</a></p>`;
+  page.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}<br><a href="./">Back to the bookshelf</a></p>`;
 }

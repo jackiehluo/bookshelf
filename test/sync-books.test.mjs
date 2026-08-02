@@ -9,6 +9,7 @@ import {
   mergeReadwise,
   parseGoodreadsCsv,
   parseGoodreadsRss,
+  publicBookSlug,
   publicBookRecord,
 } from "../scripts/sync-books.mjs";
 
@@ -333,11 +334,25 @@ test("builds lightweight public book records with a separate highlight path", ()
   });
 
   assert.deepEqual(record, {
-    id: "goodreads:42",
     title: "The Test Book",
     author: "Test Author",
+    slug: "the-test-book",
     legacy: { order: 7 },
     highlightCount: 1,
-    highlightsPath: "static/data/highlights/goodreads-42.json",
+    highlightsPath: "static/data/highlights/the-test-book.json",
   });
+});
+
+test("creates readable public slugs without service identifiers", () => {
+  assert.equal(
+    publicBookSlug({
+      title: "The Strength of the Few (Hierarchy, #2)",
+      author: "James Islington",
+    }),
+    "the-strength-of-the-few",
+  );
+  assert.equal(
+    publicBookSlug({ title: "美国反对美国", author: "Wang Huning" }),
+    "美国反对美国",
+  );
 });

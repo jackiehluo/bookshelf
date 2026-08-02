@@ -27,11 +27,11 @@ jobs:
         run: node scripts/sync-books.mjs
       - name: persist changes
         run: |
-          if git diff --quiet -- static/data; then
+          if git diff --quiet -- _data static/data; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add static/data
+          git add _data static/data
           git commit -m "update bookshelf data"
           git push
