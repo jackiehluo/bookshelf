@@ -17,19 +17,23 @@ test("decodes Readwise text fields including null values", () => {
   assert.equal(decodeEntities(null), "");
 });
 
-test("parses readable and abandoned books from a Goodreads CSV", () => {
+test("parses visible Goodreads shelf states from a CSV", () => {
   const csv = `Book Id,Title,Author,ISBN13,My Rating,Date Read,Date Added,Bookshelves,Exclusive Shelf
 1,"A Book, With a Comma",Ann Author,9781234567890,4,2026/07/31,2026/07/01,,read
 2,The Unfinished Book,Dan Writer,,0,,2026/07/30,did-not-finish,did-not-finish
-3,Future Book,Pat Person,,0,,2026/08/01,,to-read`;
+3,Future Book,Pat Person,,0,,2026/08/01,,to-read
+4,The Paused Book,Pam Writer,,0,,2026/07/29,,on-hold
+5,The Current Book,Chris Reader,,0,,2026/07/28,,currently-reading`;
 
   const books = parseGoodreadsCsv(csv);
-  assert.equal(books.length, 2);
+  assert.equal(books.length, 4);
   assert.deepEqual(
     books.map(({ title, status, rating, dateRead, dateAdded }) => ({ title, status, rating, dateRead, dateAdded })),
     [
       { title: "A Book, With a Comma", status: "read", rating: 4, dateRead: "2026-07-31", dateAdded: "2026-07-01" },
       { title: "The Unfinished Book", status: "dnf", rating: null, dateRead: null, dateAdded: "2026-07-30" },
+      { title: "The Paused Book", status: "paused", rating: null, dateRead: null, dateAdded: "2026-07-29" },
+      { title: "The Current Book", status: "reading", rating: null, dateRead: null, dateAdded: "2026-07-28" },
     ],
   );
 });
@@ -99,6 +103,7 @@ test("keeps an existing date added when merging Goodreads RSS updates", () => {
     id: "goodreads:42",
     title: "The Test Book",
     author: "Test Author",
+    status: "dnf",
     dateAdded: "2023-12-01",
     identifiers: { goodreads: "42" },
   }];
@@ -111,6 +116,26 @@ test("keeps an existing date added when merging Goodreads RSS updates", () => {
   const [merged] = mergeBooks(existing, incoming, { preserveDateAdded: true });
   assert.equal(merged.dateAdded, "2023-12-01");
   assert.equal(merged.rating, 4);
+});
+
+test("uses the shelf-change date when a paused book changes status", () => {
+  const existing = [{
+    id: "goodreads:42",
+    title: "The Test Book",
+    author: "Test Author",
+    status: "paused",
+    dateAdded: "2023-12-01",
+    identifiers: { goodreads: "42" },
+  }];
+  const incoming = [{
+    ...existing[0],
+    status: "dnf",
+    dateAdded: "2026-08-02",
+  }];
+
+  const [merged] = mergeBooks(existing, incoming, { preserveDateAdded: true });
+  assert.equal(merged.status, "dnf");
+  assert.equal(merged.dateAdded, "2026-08-02");
 });
 
 test("matches subtitle and series variants only when authors agree", () => {

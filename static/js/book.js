@@ -10,10 +10,14 @@ const page = document.querySelector("#book-page");
 const highlightMarkup = (highlight) =>
   `<li class="highlight"><blockquote>${escapeHtml(highlight.text)}</blockquote></li>`;
 
+const statusMarkup = (book) => ({
+  dnf: '<span class="status">didn’t finish</span>',
+  paused: '<span class="status">paused</span>',
+  reading: '<span class="status">currently reading</span>',
+})[book.status] || ratingMarkup(book.rating);
+
 const bookMetaMarkup = (book, highlightCount) => {
-  const status = book.status === "dnf"
-    ? '<span class="status">didn’t finish</span>'
-    : ratingMarkup(book.rating);
+  const status = statusMarkup(book);
   const readDate = book.dateRead
     ? `<time class="book-page-date" datetime="${escapeHtml(book.dateRead)}">${formatDate(book.dateRead)}</time>`
     : "";
@@ -66,7 +70,7 @@ try {
     highlights = (await highlightsResponse.json()).highlights || [];
   }
 
-  document.title = `${book.title} — Jackie Luo`;
+  document.title = `${book.title} | Jackie Luo`;
   page.setAttribute("aria-busy", "false");
   render(book, highlights);
 } catch (error) {

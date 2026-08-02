@@ -10,11 +10,15 @@ import {
 const DATA_URL = "static/data/catalog.json";
 const shelf = document.querySelector("#bookshelf");
 
+const statusMarkup = (book) => ({
+  dnf: '<span class="status">didn’t finish</span>',
+  paused: '<span class="status">paused</span>',
+  reading: '<span class="status">currently reading</span>',
+})[book.status] || ratingMarkup(book.rating);
+
 const rowMetaMarkup = (book) => {
-  const date = displayDateFor(book);
-  const status = book.status === "dnf"
-    ? '<span class="status">didn’t finish</span>'
-    : ratingMarkup(book.rating);
+  const date = ["paused", "reading"].includes(book.status) ? "" : displayDateFor(book);
+  const status = statusMarkup(book);
   const formattedDate = formatDate(date);
   const dateMarkup = formattedDate
     ? `<time class="book-date" datetime="${escapeHtml(date)}">${formattedDate}</time>`
@@ -27,7 +31,7 @@ const bookMarkup = (book) => {
   const tag = hasDetails ? "a" : "div";
   const link = hasDetails ? ` href="${bookUrlFor(book)}"` : "";
   return `
-  <${tag} class="book${hasDetails ? "" : " is-static"}${Number(book.rating) >= 4 ? " is-highly-rated" : ""}${book.status === "dnf" ? " is-dnf" : ""}"${link}>
+  <${tag} class="book${hasDetails ? "" : " is-static"}${Number(book.rating) >= 4 ? " is-highly-rated" : ""}${book.status === "dnf" ? " is-dnf" : ""}${book.status === "paused" ? " is-paused" : ""}"${link}>
     <span class="book-label">
       <span class="book-title" title="${escapeHtml(book.title)}">${escapeHtml(shortTitleFor(book.title))}</span><span class="book-author">${escapeHtml(book.author || "Unknown author")}</span>
     </span>
@@ -48,6 +52,9 @@ try {
   if (!response.ok) throw new Error(`Could not load books (${response.status})`);
   const data = await response.json();
   const books = [...(data.books || [])].sort((a, b) => {
+    const shelfPriority = { reading: 2, paused: 1 };
+    const statusComparison = (shelfPriority[b.status] || 0) - (shelfPriority[a.status] || 0);
+    if (statusComparison) return statusComparison;
     const dateComparison = displayDateFor(b).localeCompare(displayDateFor(a));
     if (dateComparison) return dateComparison;
     return (a.legacy?.order ?? Number.MAX_SAFE_INTEGER) - (b.legacy?.order ?? Number.MAX_SAFE_INTEGER);

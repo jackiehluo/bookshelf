@@ -88,6 +88,14 @@ main {
   text-decoration-thickness: 1px;
 }
 
+.book.is-paused .book-title {
+  color: #777;
+}
+
+.book.is-paused .book-author {
+  color: var(--faint);
+}
+
 .book-row-meta {
   position: absolute;
   top: 0.08rem;

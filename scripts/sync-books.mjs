@@ -65,6 +65,8 @@ const normalizeIsbn = (value = "") => value.replace(/[^0-9X]/gi, "").toUpperCase
 const statusFromShelves = (value = "") => {
   const shelves = value.toLowerCase().split(/[,|]/).map((shelf) => shelf.trim());
   if (shelves.some((shelf) => ["did-not-finish", "dnf", "stopped", "abandoned"].includes(shelf))) return "dnf";
+  if (shelves.includes("on-hold")) return "paused";
+  if (shelves.includes("currently-reading")) return "reading";
   if (shelves.includes("read")) return "read";
   return null;
 };
@@ -265,7 +267,7 @@ export const mergeBooks = (existingBooks, incomingBooks, { preserveDateAdded = f
       ...existing,
       ...incoming,
       dateRead: incoming.dateRead || existing.dateRead || null,
-      dateAdded: preserveDateAdded
+      dateAdded: preserveDateAdded && incoming.status === existing.status
         ? existing.dateAdded || incoming.dateAdded || null
         : incoming.dateAdded || existing.dateAdded || null,
       coverUrl: incoming.coverUrl || existing.coverUrl || null,
@@ -357,6 +359,18 @@ export const publicBookRecord = (book) => {
   };
 };
 
+const writeHighlightData = async (filePath, data) => {
+  try {
+    const existing = JSON.parse(await readFile(filePath, "utf8"));
+    const { updatedAt: _existingUpdatedAt, ...existingContent } = existing;
+    const { updatedAt: _nextUpdatedAt, ...nextContent } = data;
+    if (JSON.stringify(existingContent) === JSON.stringify(nextContent)) return;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  await writeFile(filePath, `${JSON.stringify(data)}\n`);
+};
+
 const writePublicData = async (books, updatedAt) => {
   await mkdir(highlightsDirectory, { recursive: true });
   const catalogBooks = books.map(publicBookRecord);
@@ -380,7 +394,7 @@ const writePublicData = async (books, updatedAt) => {
       `${JSON.stringify({ schemaVersion: 1, updatedAt, books: catalogBooks })}\n`,
     ),
     ...[...highlightFiles].map(([filename, data]) =>
-      writeFile(path.join(highlightsDirectory, filename), `${JSON.stringify(data)}\n`)),
+      writeHighlightData(path.join(highlightsDirectory, filename), data)),
   ]);
 
   const existingFiles = await readdir(highlightsDirectory);
@@ -441,6 +455,9 @@ const main = async () => {
   }
 
   nextBooks = compactBooks(nextBooks).sort((a, b) => {
+    const shelfPriority = { reading: 2, paused: 1 };
+    const statusComparison = (shelfPriority[b.status] || 0) - (shelfPriority[a.status] || 0);
+    if (statusComparison) return statusComparison;
     const dateComparison = (b.dateRead || b.dateAdded || "").localeCompare(a.dateRead || a.dateAdded || "");
     if (dateComparison) return dateComparison;
     return (a.legacy?.order ?? Number.MAX_SAFE_INTEGER) - (b.legacy?.order ?? Number.MAX_SAFE_INTEGER);
