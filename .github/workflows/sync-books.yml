@@ -1,0 +1,37 @@
+name: sync books
+
+on:
+  schedule:
+    - cron: "17 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-books
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: fetch reading data
+        env:
+          GOODREADS_RSS_URL: ${{ secrets.GOODREADS_RSS_URL }}
+          READWISE_TOKEN: ${{ secrets.READWISE_TOKEN }}
+        run: node scripts/sync-books.mjs
+      - name: persist changes
+        run: |
+          if git diff --quiet -- static/data; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add static/data
+          git commit -m "update bookshelf data"
+          git push
