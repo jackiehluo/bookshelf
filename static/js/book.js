@@ -10,6 +10,27 @@ const page = document.querySelector("#book-page");
 const highlightMarkup = (highlight) =>
   `<li class="highlight"><blockquote>${escapeHtml(highlight.text)}</blockquote></li>`;
 
+const titleMarkup = (title) => {
+  let primary = title.trim();
+  const secondary = [];
+  let series = primary.match(/\s+(\([^()]+\))$/);
+  while (series) {
+    primary = primary.slice(0, series.index).trim();
+    secondary.unshift(series[1]);
+    series = primary.match(/\s+(\([^()]+\))$/);
+  }
+
+  const separator = primary.indexOf(":");
+  if (separator !== -1) {
+    const subtitle = primary.slice(separator + 1).trim();
+    primary = primary.slice(0, separator).trim();
+    if (subtitle) secondary.unshift(subtitle);
+  }
+
+  if (!primary || !secondary.length) return escapeHtml(title);
+  return `<span class="book-page-title-primary">${escapeHtml(primary)}</span>${secondary.map((part) => `<span class="book-page-subtitle">${escapeHtml(part)}</span>`).join("")}`;
+};
+
 const statusMarkup = (book) => ({
   dnf: '<span class="status">didn’t finish</span>',
   paused: '<span class="status">paused</span>',
@@ -41,7 +62,7 @@ const render = (book, highlights) => {
     <article class="book-profile${book.status === "dnf" ? " is-dnf" : ""}">
       <header class="book-profile-header">
         <div class="book-profile-copy">
-          <h1 class="book-page-title">${escapeHtml(book.title)}</h1>
+          <h1 class="book-page-title" aria-label="${escapeHtml(book.title)}">${titleMarkup(book.title)}</h1>
           <p class="book-page-author">${escapeHtml(book.author || "Unknown author")}</p>
           <div class="book-page-meta">${bookMetaMarkup(book, highlights.length)}</div>
         </div>

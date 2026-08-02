@@ -175,6 +175,19 @@ main {
   line-height: 1.25;
 }
 
+.book-page-subtitle {
+  display: block;
+  margin-top: 0.3rem;
+  color: #555;
+  font-size: 0.72em;
+  font-weight: 300;
+  line-height: 1.35;
+}
+
+.book-page-subtitle + .book-page-subtitle {
+  margin-top: 0.1rem;
+}
+
 .book-page-author {
   margin: 0.55rem 0 0;
   color: #777;
