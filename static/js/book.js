@@ -85,7 +85,7 @@ try {
   const bookId = new URLSearchParams(window.location.search).get("id");
   if (!bookId) throw new Error("No book was selected.");
 
-  const catalogResponse = await fetch(CATALOG_URL);
+  const catalogResponse = await fetch(CATALOG_URL, { cache: "no-store" });
   if (!catalogResponse.ok) throw new Error(`Could not load the bookshelf (${catalogResponse.status})`);
   const catalog = await catalogResponse.json();
   const book = (catalog.books || []).find(({ id }) => id === bookId);
@@ -93,7 +93,7 @@ try {
 
   let highlights = [];
   if (book.highlightsPath) {
-    const highlightsResponse = await fetch(book.highlightsPath);
+    const highlightsResponse = await fetch(book.highlightsPath, { cache: "no-store" });
     if (!highlightsResponse.ok) throw new Error(`Could not load highlights (${highlightsResponse.status})`);
     highlights = (await highlightsResponse.json()).highlights || [];
   }
