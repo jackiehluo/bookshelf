@@ -133,7 +133,6 @@ main {
   font-size: 0.72rem;
 }
 
-.loading,
 .empty-state {
   min-height: 25vh;
   display: grid;
