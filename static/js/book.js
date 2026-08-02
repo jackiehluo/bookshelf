@@ -52,7 +52,7 @@ const bookMetaMarkup = (book, highlightCount) => {
 
 const render = (book, highlights) => {
   const cover = book.coverUrl
-    ? `<img class="book-cover" src="${escapeHtml(book.coverUrl)}" alt="Cover of ${escapeHtml(book.title)}" />`
+    ? `<div class="book-cover-frame"><img class="book-cover" src="${escapeHtml(book.coverUrl)}" alt="Cover of ${escapeHtml(book.title)}" /></div>`
     : "";
   const highlightsContent = highlights.length
     ? `<ol class="highlight-list">${highlights.map(highlightMarkup).join("")}</ol>`
@@ -72,6 +72,13 @@ const render = (book, highlights) => {
         ${highlightsContent}
       </section>
     </article>`;
+
+  const coverImage = page.querySelector(".book-cover");
+  if (coverImage) {
+    const revealCover = () => coverImage.classList.add("is-loaded");
+    if (coverImage.complete && coverImage.naturalWidth > 0) revealCover();
+    else coverImage.addEventListener("load", revealCover, { once: true });
+  }
 };
 
 try {
