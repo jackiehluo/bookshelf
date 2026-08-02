@@ -59,7 +59,7 @@ main {
   font-weight: 300;
 }
 
-.book.is-highly-rated .book-title {
+.book.is-recommended .book-title {
   font-weight: 700;
 }
 

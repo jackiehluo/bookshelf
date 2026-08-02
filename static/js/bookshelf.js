@@ -3,9 +3,10 @@ import {
   displayDateFor,
   escapeHtml,
   formatDate,
+  isRecommended,
   ratingMarkup,
   shortTitleFor,
-} from "./book-utils.js";
+} from "./book-utils.js?v=20260802-1";
 
 const DATA_URL = "static/data/catalog.json";
 const shelf = document.querySelector("#bookshelf");
@@ -31,7 +32,7 @@ const bookMarkup = (book) => {
   const tag = hasDetails ? "a" : "div";
   const link = hasDetails ? ` href="${bookUrlFor(book)}"` : "";
   return `
-  <${tag} class="book${hasDetails ? "" : " is-static"}${Number(book.rating) >= 4 ? " is-highly-rated" : ""}${book.status === "dnf" ? " is-dnf" : ""}${book.status === "paused" ? " is-paused" : ""}"${link}>
+  <${tag} class="book${hasDetails ? "" : " is-static"}${isRecommended(book) ? " is-recommended" : ""}${book.status === "dnf" ? " is-dnf" : ""}${book.status === "paused" ? " is-paused" : ""}"${link}>
     <span class="book-label">
       <span class="book-title" title="${escapeHtml(book.title)}">${escapeHtml(shortTitleFor(book.title))}</span><span class="book-author">${escapeHtml(book.author || "Unknown author")}</span>
     </span>

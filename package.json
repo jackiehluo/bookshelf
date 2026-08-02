@@ -1,6 +1,7 @@
 {
   "name": "bookshelf",
   "private": true,
+  "type": "module",
   "scripts": {
     "sync": "node scripts/sync-books.mjs",
     "test": "node --test"
