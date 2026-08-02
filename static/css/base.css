@@ -105,7 +105,7 @@ main {
   white-space: nowrap;
 }
 
-.book:not(.is-static):hover .book-row-meta,
+.book:hover .book-row-meta,
 .book:focus-visible .book-row-meta {
   opacity: 1;
 }

@@ -31,7 +31,7 @@ const bookMarkup = (book) => {
     <span class="book-label">
       <span class="book-title" title="${escapeHtml(book.title)}">${escapeHtml(shortTitleFor(book.title))}</span><span class="book-author">${escapeHtml(book.author || "Unknown author")}</span>
     </span>
-    ${hasDetails ? `<span class="book-row-meta" aria-hidden="true">${rowMetaMarkup(book)}</span>` : ""}
+    <span class="book-row-meta" aria-hidden="true">${rowMetaMarkup(book)}</span>
   </${tag}>`;
 };
 
