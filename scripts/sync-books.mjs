@@ -138,7 +138,8 @@ export const parseGoodreadsRss = (xml) =>
   (xml.match(/<item\b[\s\S]*?<\/item>/gi) || [])
     .map((item) => {
       const shelves = tagValue(item, "user_shelves");
-      const status = statusFromShelves(shelves);
+      const readAt = tagValue(item, "user_read_at");
+      const status = statusFromShelves(shelves) || (readAt ? "read" : null);
       if (!status) return null;
       const goodreadsId = tagValue(item, "book_id") || item.match(/<book\s+id=["'](\d+)["']/i)?.[1] || "";
       const title = tagValue(item, "title");
@@ -150,7 +151,7 @@ export const parseGoodreadsRss = (xml) =>
         author,
         status,
         rating: Number(tagValue(item, "user_rating")) || null,
-        dateRead: normalizeDate(tagValue(item, "user_read_at")),
+        dateRead: normalizeDate(readAt),
         dateAdded: normalizeDate(tagValue(item, "user_date_added") || tagValue(item, "pubDate")),
         coverUrl:
           tagValue(item, "book_large_image_url") ||

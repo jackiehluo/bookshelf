@@ -69,6 +69,23 @@ test("parses the fields used by the public page from Goodreads RSS", () => {
   ]);
 });
 
+test("infers a read status when Goodreads omits shelves but includes a read date", () => {
+  const rss = `<rss><channel><item>
+    <title><![CDATA[The Wild Edge of Sorrow]]></title>
+    <book_id>26532000</book_id>
+    <author_name>Francis Weller</author_name>
+    <user_rating>3</user_rating>
+    <user_read_at>Sat, 8 Aug 2026 00:00:00 +0000</user_read_at>
+    <user_date_added>Sat, 08 Aug 2026 02:29:29 -0700</user_date_added>
+    <user_shelves></user_shelves>
+  </item></channel></rss>`;
+
+  const [book] = parseGoodreadsRss(rss);
+  assert.equal(book.status, "read");
+  assert.equal(book.dateRead, "2026-08-08");
+  assert.equal(book.rating, 3);
+});
+
 test("upserts imported metadata without discarding existing highlights", () => {
   const existing = [{
     id: "legacy:test-book-test-author",
