@@ -32,7 +32,7 @@ node scripts/sync-books.mjs --build-public-data
 
 ## Automation
 
-The weekly GitHub Action needs these repository secrets:
+The daily GitHub Action needs these repository secrets:
 
 - `GOODREADS_RSS_URL`: the `#ALL#` Goodreads bookshelf RSS URL
 - `READWISE_TOKEN`: a token from `https://readwise.io/access_token`

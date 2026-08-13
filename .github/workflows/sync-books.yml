@@ -2,7 +2,7 @@ name: sync books
 
 on:
   schedule:
-    - cron: "17 10 * * 1"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 permissions:
