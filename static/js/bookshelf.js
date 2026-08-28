@@ -11,8 +11,7 @@ import {
 
 const DATA_URL = "static/data/catalog.json";
 const shelf = document.querySelector("#bookshelf");
-const filterButton = document.querySelector(".bookshelf-filter");
-const selectedFilter = () => new URLSearchParams(window.location.search).get("filter") === "formative" ? "formative" : "all";
+const selectedFilter = document.body.dataset.filter || "all";
 
 const statusMarkup = (book) => ({
   dnf: '<span class="status">didn’t finish</span>',
@@ -51,12 +50,6 @@ const render = (books) => {
   shelf.innerHTML = books.map(bookMarkup).join("");
 };
 
-const renderFilter = (books, filter) => {
-  const isFormative = filter === "formative";
-  filterButton.textContent = isFormative ? "view all works" : "view formative works";
-  render(booksForFilter(books, filter));
-};
-
 try {
   const response = await fetch(DATA_URL, { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not load books (${response.status})`);
@@ -69,16 +62,8 @@ try {
     if (dateComparison) return dateComparison;
     return (a.legacy?.order ?? Number.MAX_SAFE_INTEGER) - (b.legacy?.order ?? Number.MAX_SAFE_INTEGER);
   });
-  filterButton.addEventListener("click", () => {
-    const filter = selectedFilter() === "formative" ? "all" : "formative";
-    const url = new URL(window.location.href);
-    if (filter === "formative") url.searchParams.set("filter", "formative");
-    else url.searchParams.delete("filter");
-    window.history.replaceState({}, "", url);
-    renderFilter(books, filter);
-  });
   shelf.setAttribute("aria-busy", "false");
-  renderFilter(books, selectedFilter());
+  render(booksForFilter(books, selectedFilter));
 } catch (error) {
   shelf.setAttribute("aria-busy", "false");
   shelf.innerHTML = `<p class="empty-state">The shelf couldn’t be opened.<br>${escapeHtml(error.message)}</p>`;

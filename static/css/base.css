@@ -50,14 +50,8 @@ main {
   position: absolute;
   top: 1.25rem;
   right: 1.25rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
   color: var(--faint);
-  background: transparent;
-  font: inherit;
   font-size: 0.72rem;
-  cursor: pointer;
 }
 
 .bookshelf-filter:hover,
