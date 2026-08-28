@@ -24,6 +24,8 @@ Readwise Reader PDFs are considered too, even when Readwise categorizes them as 
 
 Books from the original hand-maintained site are retained without dates after the Goodreads history, including during a full CSV replacement.
 
+`_data/formative-works.json` contains the hand-picked formative works. Each entry uses the source book ID so catalog syncs can update titles without losing the selection. The public-data build fails if an ID is duplicated or no longer exists.
+
 Rebuild the public catalog and per-book files without fetching remote data:
 
 ```sh

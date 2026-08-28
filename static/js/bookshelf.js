@@ -1,15 +1,18 @@
 import {
   bookUrlFor,
+  booksForFilter,
   displayDateFor,
   escapeHtml,
   formatDate,
   isRecommended,
   ratingMarkup,
   shortTitleFor,
-} from "./book-utils.js?v=20260802-1";
+} from "./book-utils.js?v=20260828-2";
 
 const DATA_URL = "static/data/catalog.json";
 const shelf = document.querySelector("#bookshelf");
+const filterButton = document.querySelector(".bookshelf-filter");
+const selectedFilter = () => new URLSearchParams(window.location.search).get("filter") === "formative" ? "formative" : "all";
 
 const statusMarkup = (book) => ({
   dnf: '<span class="status">didn’t finish</span>',
@@ -32,7 +35,7 @@ const bookMarkup = (book) => {
   const tag = hasDetails ? "a" : "div";
   const link = hasDetails ? ` href="${bookUrlFor(book)}"` : "";
   return `
-  <${tag} class="book${hasDetails ? "" : " is-static"}${isRecommended(book) ? " is-recommended" : ""}${book.status === "dnf" ? " is-dnf" : ""}${book.status === "paused" ? " is-paused" : ""}"${link}>
+  <${tag} class="book${hasDetails ? "" : " is-static"}${isRecommended(book) ? " is-recommended" : ""}${book.formativeWork ? " is-formative-work" : ""}${book.status === "dnf" ? " is-dnf" : ""}${book.status === "paused" ? " is-paused" : ""}"${link}>
     <span class="book-label">
       <span class="book-title" title="${escapeHtml(book.title)}">${escapeHtml(shortTitleFor(book.title))}</span><span class="book-author">${escapeHtml(book.author || "Unknown author")}</span>
     </span>
@@ -48,6 +51,12 @@ const render = (books) => {
   shelf.innerHTML = books.map(bookMarkup).join("");
 };
 
+const renderFilter = (books, filter) => {
+  const isFormative = filter === "formative";
+  filterButton.textContent = isFormative ? "view all works" : "view formative works";
+  render(booksForFilter(books, filter));
+};
+
 try {
   const response = await fetch(DATA_URL, { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not load books (${response.status})`);
@@ -60,8 +69,16 @@ try {
     if (dateComparison) return dateComparison;
     return (a.legacy?.order ?? Number.MAX_SAFE_INTEGER) - (b.legacy?.order ?? Number.MAX_SAFE_INTEGER);
   });
+  filterButton.addEventListener("click", () => {
+    const filter = selectedFilter() === "formative" ? "all" : "formative";
+    const url = new URL(window.location.href);
+    if (filter === "formative") url.searchParams.set("filter", "formative");
+    else url.searchParams.delete("filter");
+    window.history.replaceState({}, "", url);
+    renderFilter(books, filter);
+  });
   shelf.setAttribute("aria-busy", "false");
-  render(books);
+  renderFilter(books, selectedFilter());
 } catch (error) {
   shelf.setAttribute("aria-busy", "false");
   shelf.innerHTML = `<p class="empty-state">The shelf couldn’t be opened.<br>${escapeHtml(error.message)}</p>`;

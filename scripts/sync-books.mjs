@@ -7,6 +7,7 @@ const dataPath = path.join(root, "_data/books.json");
 const catalogPath = path.join(root, "static/data/catalog.json");
 const highlightsDirectory = path.join(root, "static/data/highlights");
 const readwiseMatchesPath = path.join(root, "_data/readwise-matches.json");
+const formativeWorksPath = path.join(root, "_data/formative-works.json");
 
 export const decodeEntities = (value = "") =>
   String(value ?? "")
@@ -349,7 +350,23 @@ export const publicBookSlug = ({ title = "" }) =>
     .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
 
-export const publicBookRecord = (book) => {
+export const formativeWorkIdsFor = (books, entries) => {
+  const ids = entries.map(({ id }) => id);
+  const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+  if (duplicateIds.length) {
+    throw new Error(`Duplicate formative work IDs: ${[...new Set(duplicateIds)].join(", ")}`);
+  }
+
+  const catalogIds = new Set(books.map(({ id }) => id));
+  const missingIds = ids.filter((id) => !catalogIds.has(id));
+  if (missingIds.length) {
+    throw new Error(`Formative works missing from the catalog: ${missingIds.join(", ")}`);
+  }
+
+  return new Set(ids);
+};
+
+export const publicBookRecord = (book, formativeWorkIds = new Set()) => {
   const {
     id: _id,
     highlights = [],
@@ -362,6 +379,7 @@ export const publicBookRecord = (book) => {
     ...metadata,
     slug,
     ...(legacy?.order != null ? { legacy: { order: legacy.order } } : {}),
+    ...(formativeWorkIds.has(book.id) ? { formativeWork: true } : {}),
     highlightCount: highlights.length,
     highlightsPath: highlights.length ? `static/data/highlights/${slug}.json` : null,
   };
@@ -379,9 +397,9 @@ const writeHighlightData = async (filePath, data) => {
   await writeFile(filePath, `${JSON.stringify(data)}\n`);
 };
 
-const writePublicData = async (books, updatedAt) => {
+const writePublicData = async (books, updatedAt, formativeWorkIds) => {
   await mkdir(highlightsDirectory, { recursive: true });
-  const catalogBooks = books.map(publicBookRecord);
+  const catalogBooks = books.map((book) => publicBookRecord(book, formativeWorkIds));
   const slugs = new Set();
   const highlightFiles = new Map();
 
@@ -423,6 +441,7 @@ const main = async () => {
   const csvFlag = argumentsList.indexOf("--goodreads-csv");
   const csvPath = csvFlag >= 0 ? argumentsList[csvFlag + 1] : null;
   const current = JSON.parse(await readFile(dataPath, "utf8"));
+  const formativeWorks = JSON.parse(await readFile(formativeWorksPath, "utf8"));
   const currentBooks = structuredClone(current.books || []);
   let nextBooks = argumentsList.includes("--replace")
     ? currentBooks.filter(({ legacy }) => legacy?.source === "original-bookshelf")
@@ -474,6 +493,7 @@ const main = async () => {
     if (dateComparison) return dateComparison;
     return (a.legacy?.order ?? Number.MAX_SAFE_INTEGER) - (b.legacy?.order ?? Number.MAX_SAFE_INTEGER);
   });
+  const formativeWorkIds = formativeWorkIdsFor(nextBooks, formativeWorks.books || []);
   const booksChanged = JSON.stringify(current.books || []) !== JSON.stringify(nextBooks);
   const updatedAt = booksChanged ? new Date().toISOString() : current.updatedAt;
   if (booksChanged) {
@@ -485,7 +505,7 @@ const main = async () => {
   } else {
     console.log("Bookshelf is already current.");
   }
-  await writePublicData(nextBooks, updatedAt);
+  await writePublicData(nextBooks, updatedAt, formativeWorkIds);
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -46,6 +46,30 @@ main {
   padding-top: 10vh;
 }
 
+.bookshelf-filter {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--faint);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.bookshelf-filter:hover,
+.bookshelf-filter:focus-visible {
+  color: var(--ink);
+}
+
+.bookshelf-filter:focus-visible {
+  outline: 1px solid var(--faint);
+  outline-offset: 3px;
+}
+
 .book {
   position: relative;
   display: block;
@@ -59,7 +83,8 @@ main {
   font-weight: 300;
 }
 
-.book.is-recommended .book-title {
+.book.is-recommended .book-title,
+.book.is-formative-work .book-title {
   font-weight: 700;
 }
 

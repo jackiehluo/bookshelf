@@ -9,6 +9,7 @@ import {
   mergeReadwise,
   parseGoodreadsCsv,
   parseGoodreadsRss,
+  formativeWorkIdsFor,
   publicBookSlug,
   publicBookRecord,
 } from "../scripts/sync-books.mjs";
@@ -358,6 +359,32 @@ test("builds lightweight public book records with a separate highlight path", ()
     highlightCount: 1,
     highlightsPath: "static/data/highlights/the-test-book.json",
   });
+});
+
+test("marks selected books in the public catalog", () => {
+  const book = {
+    id: "goodreads:42",
+    title: "The Test Book",
+    author: "Test Author",
+    identifiers: {},
+    highlights: [],
+  };
+
+  assert.equal(publicBookRecord(book, new Set([book.id])).formativeWork, true);
+  assert.equal("formativeWork" in publicBookRecord(book), false);
+});
+
+test("validates hand-picked formative work IDs against the source catalog", () => {
+  const books = [{ id: "goodreads:42" }, { id: "goodreads:43" }];
+  assert.deepEqual([...formativeWorkIdsFor(books, [{ id: "goodreads:42" }])], ["goodreads:42"]);
+  assert.throws(
+    () => formativeWorkIdsFor(books, [{ id: "goodreads:99" }]),
+    /missing from the catalog: goodreads:99/,
+  );
+  assert.throws(
+    () => formativeWorkIdsFor(books, [{ id: "goodreads:42" }, { id: "goodreads:42" }]),
+    /Duplicate formative work IDs: goodreads:42/,
+  );
 });
 
 test("creates readable public slugs without service identifiers", () => {
