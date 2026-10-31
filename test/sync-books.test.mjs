@@ -8,7 +8,6 @@ import {
   mergeBooks,
   mergeReadwise,
   parseGoodreadsCsv,
-  parseGoodreadsRss,
   formativeWorkIdsFor,
   publicBookSlug,
   publicBookRecord,
@@ -40,53 +39,6 @@ test("parses visible Goodreads shelf states from a CSV", () => {
   );
 });
 
-test("parses the fields used by the public page from Goodreads RSS", () => {
-  const rss = `<rss><channel><item>
-    <title><![CDATA[The Test Book]]></title>
-    <link>https://www.goodreads.com/book/show/42</link>
-    <book_id>42</book_id>
-    <book_large_image_url>https://images.example/42.jpg</book_large_image_url>
-    <author_name>Test Author</author_name>
-    <isbn>123456789X</isbn>
-    <user_rating>5</user_rating>
-    <user_read_at>2026/08/01</user_read_at>
-    <user_date_added>2026/07/01</user_date_added>
-    <user_shelves>read, favorites</user_shelves>
-  </item></channel></rss>`;
-
-  assert.deepEqual(parseGoodreadsRss(rss), [
-    {
-      id: "goodreads:42",
-      title: "The Test Book",
-      author: "Test Author",
-      status: "read",
-      rating: 5,
-      dateRead: "2026-08-01",
-      dateAdded: "2026-07-01",
-      coverUrl: "https://images.example/42.jpg",
-      identifiers: { goodreads: "42", isbn: "123456789X", asin: null, readwise: null },
-      highlights: [],
-    },
-  ]);
-});
-
-test("infers a read status when Goodreads omits shelves but includes a read date", () => {
-  const rss = `<rss><channel><item>
-    <title><![CDATA[The Wild Edge of Sorrow]]></title>
-    <book_id>26532000</book_id>
-    <author_name>Francis Weller</author_name>
-    <user_rating>3</user_rating>
-    <user_read_at>Sat, 8 Aug 2026 00:00:00 +0000</user_read_at>
-    <user_date_added>Sat, 08 Aug 2026 02:29:29 -0700</user_date_added>
-    <user_shelves></user_shelves>
-  </item></channel></rss>`;
-
-  const [book] = parseGoodreadsRss(rss);
-  assert.equal(book.status, "read");
-  assert.equal(book.dateRead, "2026-08-08");
-  assert.equal(book.rating, 3);
-});
-
 test("upserts imported metadata without discarding existing highlights", () => {
   const existing = [{
     id: "legacy:test-book-test-author",
@@ -115,46 +67,6 @@ test("upserts imported metadata without discarding existing highlights", () => {
   assert.equal(merged.identifiers.readwise, "7");
   assert.equal(merged.identifiers.goodreads, "42");
   assert.deepEqual(merged.highlights, [{ id: "9", text: "Keep me" }]);
-});
-
-test("keeps an existing date added when merging Goodreads RSS updates", () => {
-  const existing = [{
-    id: "goodreads:42",
-    title: "The Test Book",
-    author: "Test Author",
-    status: "dnf",
-    dateAdded: "2023-12-01",
-    identifiers: { goodreads: "42" },
-  }];
-  const incoming = [{
-    ...existing[0],
-    dateAdded: "2026-03-09",
-    rating: 4,
-  }];
-
-  const [merged] = mergeBooks(existing, incoming, { preserveDateAdded: true });
-  assert.equal(merged.dateAdded, "2023-12-01");
-  assert.equal(merged.rating, 4);
-});
-
-test("uses the shelf-change date when a paused book changes status", () => {
-  const existing = [{
-    id: "goodreads:42",
-    title: "The Test Book",
-    author: "Test Author",
-    status: "paused",
-    dateAdded: "2023-12-01",
-    identifiers: { goodreads: "42" },
-  }];
-  const incoming = [{
-    ...existing[0],
-    status: "dnf",
-    dateAdded: "2026-08-02",
-  }];
-
-  const [merged] = mergeBooks(existing, incoming, { preserveDateAdded: true });
-  assert.equal(merged.status, "dnf");
-  assert.equal(merged.dateAdded, "2026-08-02");
 });
 
 test("matches subtitle and series variants only when authors agree", () => {

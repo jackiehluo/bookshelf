@@ -20,9 +20,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+      - name: test sync
+        run: node --test
       - name: fetch reading data
         env:
-          GOODREADS_RSS_URL: ${{ secrets.GOODREADS_RSS_URL }}
           READWISE_TOKEN: ${{ secrets.READWISE_TOKEN }}
         run: node scripts/sync-books.mjs
       - name: persist changes

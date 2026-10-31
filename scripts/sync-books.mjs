@@ -1,12 +1,14 @@
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fetchReadwiseBooks, parseReadwiseBooks } from "./readwise-books.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataPath = path.join(root, "_data/books.json");
 const catalogPath = path.join(root, "static/data/catalog.json");
 const highlightsDirectory = path.join(root, "static/data/highlights");
 const readwiseMatchesPath = path.join(root, "_data/readwise-matches.json");
+const readwiseBooksMatchesPath = path.join(root, "_data/readwise-books-matches.json");
 const formativeWorksPath = path.join(root, "_data/formative-works.json");
 
 export const decodeEntities = (value = "") =>
@@ -20,11 +22,6 @@ export const decodeEntities = (value = "") =>
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
     .trim();
-
-const tagValue = (xml, name) => {
-  const match = xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, "i"));
-  return match ? decodeEntities(match[1]) : "";
-};
 
 const normalizeDate = (value = "") => {
   const match = value.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
@@ -41,10 +38,11 @@ const normalizeText = (value = "") =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+const withoutSeries = (value) => value.replace(/(?:\s*\([^()]*\)\s*)+$/, "");
+
 const normalizeTitle = (value = "") =>
   normalizeText(
-    value
-      .replace(/(?:\s*\([^()]*\)\s*)+$/, "")
+    withoutSeries(value)
       .replace(/,\s*volume\s+\d+.*$/i, "")
       .split(":", 1)[0],
   );
@@ -135,36 +133,6 @@ export const parseGoodreadsCsv = (csv) =>
     })
     .filter(Boolean);
 
-export const parseGoodreadsRss = (xml) =>
-  (xml.match(/<item\b[\s\S]*?<\/item>/gi) || [])
-    .map((item) => {
-      const shelves = tagValue(item, "user_shelves");
-      const readAt = tagValue(item, "user_read_at");
-      const status = statusFromShelves(shelves) || (readAt ? "read" : null);
-      if (!status) return null;
-      const goodreadsId = tagValue(item, "book_id") || item.match(/<book\s+id=["'](\d+)["']/i)?.[1] || "";
-      const title = tagValue(item, "title");
-      const author = tagValue(item, "author_name");
-      const isbn = normalizeIsbn(tagValue(item, "isbn"));
-      return {
-        id: goodreadsId ? `goodreads:${goodreadsId}` : `book:${normalizeText(`${title}-${author}`)}`,
-        title,
-        author,
-        status,
-        rating: Number(tagValue(item, "user_rating")) || null,
-        dateRead: normalizeDate(readAt),
-        dateAdded: normalizeDate(tagValue(item, "user_date_added") || tagValue(item, "pubDate")),
-        coverUrl:
-          tagValue(item, "book_large_image_url") ||
-          tagValue(item, "book_medium_image_url") ||
-          tagValue(item, "book_image_url") ||
-          null,
-        identifiers: { goodreads: goodreadsId || null, isbn: isbn || null, asin: null, readwise: null },
-        highlights: [],
-      };
-    })
-    .filter((book) => book?.title);
-
 export const fetchReadwise = async (token) => {
   const books = [];
   let cursor = null;
@@ -203,6 +171,7 @@ export const fetchReadwise = async (token) => {
 export const bookMatchMethod = (existing, incoming) => {
   const left = existing.identifiers || {};
   const right = incoming.identifiers || {};
+  if (left.readwiseBooks && right.readwiseBooks && left.readwiseBooks === right.readwiseBooks) return "readwise-books";
   if (left.readwise && right.readwise && left.readwise === right.readwise) return "readwise";
   if (left.goodreads && right.goodreads && left.goodreads === right.goodreads) return "goodreads";
   if (left.isbn && right.isbn && left.isbn === right.isbn) return "isbn";
@@ -230,6 +199,7 @@ export const bookMatchMethod = (existing, incoming) => {
 };
 
 const matchPriority = {
+  "readwise-books": 4,
   readwise: 4,
   goodreads: 4,
   isbn: 4,
@@ -239,11 +209,14 @@ const matchPriority = {
   "title-prefix-author": 1,
 };
 
-const findBookMatch = (books, incoming, { allowPrefix = true } = {}) => {
+const findBookMatch = (books, incoming, { allowPrefix = true, allowSubtitleExpansion = true } = {}) => {
   let best = { index: -1, method: null, priority: 0 };
   books.forEach((book, index) => {
     const method = bookMatchMethod(book, incoming);
     if (!allowPrefix && method === "title-prefix-author") return;
+    if (!allowSubtitleExpansion && method === "title-author" && incoming.title.includes(":")) {
+      if (normalizeText(withoutSeries(book.title)) !== normalizeText(withoutSeries(incoming.title))) return;
+    }
     const priority = matchPriority[method] || 0;
     if (priority > best.priority) best = { index, method, priority };
   });
@@ -255,7 +228,7 @@ const mergeIdentifiers = (existing = {}, incoming = {}) => ({
   ...Object.fromEntries(Object.entries(incoming).filter(([, value]) => value != null && value !== "")),
 });
 
-export const mergeBooks = (existingBooks, incomingBooks, { preserveDateAdded = false } = {}) => {
+export const mergeBooks = (existingBooks, incomingBooks) => {
   const merged = structuredClone(existingBooks);
   for (const incoming of incomingBooks) {
     const { index } = findBookMatch(merged, incoming, { allowPrefix: false });
@@ -269,12 +242,60 @@ export const mergeBooks = (existingBooks, incomingBooks, { preserveDateAdded = f
       ...existing,
       ...incoming,
       dateRead: incoming.dateRead || existing.dateRead || null,
-      dateAdded: preserveDateAdded && incoming.status === existing.status
-        ? existing.dateAdded || incoming.dateAdded || null
-        : incoming.dateAdded || existing.dateAdded || null,
+      dateAdded: incoming.dateAdded || existing.dateAdded || null,
       coverUrl: incoming.coverUrl || existing.coverUrl || null,
       identifiers: mergeIdentifiers(existing.identifiers, incoming.identifiers),
       highlights: incoming.highlights?.length ? incoming.highlights : existing.highlights || [],
+    };
+  }
+  return merged;
+};
+
+export const mergeReadwiseBooks = (existingBooks, incomingBooks, matchOverrides = {}) => {
+  const merged = structuredClone(existingBooks);
+  const catalogIds = new Set(merged.map(({ id }) => id));
+  for (const id of Object.values(matchOverrides)) {
+    if (!catalogIds.has(id)) throw new Error(`Readwise Books match is missing from the catalog: ${id}`);
+  }
+  const linkedIds = new Set(merged.map((book) => book.identifiers?.readwiseBooks).filter(Boolean));
+  const completeness = (book) => Number(Boolean(book.dateRead)) + Number(book.rating != null);
+  const incoming = [...incomingBooks].sort((a, b) =>
+    Number(linkedIds.has(b.identifiers.readwiseBooks)) - Number(linkedIds.has(a.identifiers.readwiseBooks)) ||
+    completeness(b) - completeness(a) || a.id.localeCompare(b.id));
+  const seen = new Set();
+  for (const book of incoming) {
+    const overrideId = matchOverrides[book.identifiers.readwiseBooks];
+    const index = overrideId
+      ? merged.findIndex(({ id }) => id === overrideId)
+      : findBookMatch(merged, book, { allowPrefix: false, allowSubtitleExpansion: false }).index;
+    if (index === -1) {
+      merged.push({ ...book, sourceState: { readwiseBooks: { dateRead: book.dateRead, rating: book.rating } } });
+      seen.add(book.id);
+      continue;
+    }
+    const existing = merged[index];
+    if (seen.has(existing.id)) continue;
+    seen.add(existing.id);
+    const previous = existing.sourceState?.readwiseBooks;
+    merged[index] = {
+      ...existing,
+      ...book,
+      id: existing.id,
+      title: existing.title,
+      author: existing.author,
+      dateRead: previous && previous.dateRead !== book.dateRead
+        ? book.dateRead
+        : existing.dateRead || book.dateRead,
+      rating: previous && previous.rating !== book.rating
+        ? book.rating
+        : existing.rating ?? book.rating,
+      dateAdded: existing.status === book.status
+        ? existing.dateAdded || book.dateAdded
+        : book.dateAdded || existing.dateAdded,
+      coverUrl: existing.coverUrl || book.coverUrl,
+      identifiers: mergeIdentifiers(book.identifiers, existing.identifiers),
+      highlights: existing.highlights || [],
+      sourceState: { ...existing.sourceState, readwiseBooks: { dateRead: book.dateRead, rating: book.rating } },
     };
   }
   return merged;
@@ -371,6 +392,7 @@ export const publicBookRecord = (book, formativeWorkIds = new Set()) => {
     id: _id,
     highlights = [],
     identifiers: _identifiers,
+    sourceState: _sourceState,
     legacy,
     ...metadata
   } = book;
@@ -455,22 +477,18 @@ const main = async () => {
     console.log(`Imported ${imported.length} books from Goodreads CSV.`);
   }
 
-  if (process.env.GOODREADS_RSS_URL) {
-    const response = await fetch(process.env.GOODREADS_RSS_URL);
-    if (!response.ok) throw new Error(`Goodreads RSS returned ${response.status}`);
-    const recent = parseGoodreadsRss(await response.text());
-    nextBooks = mergeBooks(nextBooks, recent, { preserveDateAdded: true });
-    usedSource = true;
-    console.log(`Merged ${recent.length} recent Goodreads books.`);
-  }
-
   if (process.env.READWISE_TOKEN) {
+    const library = await fetchReadwiseBooks(process.env.READWISE_TOKEN);
+    const bookMatches = JSON.parse(await readFile(readwiseBooksMatchesPath, "utf8"));
+    const tracked = parseReadwiseBooks(library);
+    nextBooks = mergeReadwiseBooks(nextBooks, tracked, bookMatches);
+    console.log(`Merged ${tracked.length} tracked books from ${library.length} Readwise Books entries.`);
     const readwise = await fetchReadwise(process.env.READWISE_TOKEN);
     const matchOverrides = JSON.parse(await readFile(readwiseMatchesPath, "utf8"));
     const { matched, matchedBooks, methods, matches, unmatched } = mergeReadwise(nextBooks, readwise, matchOverrides);
     usedSource = true;
     console.log(
-      `Matched ${matchedBooks} Goodreads books from ${matched} of ${readwise.length} Readwise entries: ${JSON.stringify(methods)}.`,
+      `Matched ${matchedBooks} bookshelf books from ${matched} of ${readwise.length} Readwise Highlights entries: ${JSON.stringify(methods)}.`,
     );
     if (argumentsList.includes("--report-readwise-matches")) {
       console.log(JSON.stringify({
