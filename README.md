@@ -44,7 +44,19 @@ The daily GitHub Action needs one repository secret:
 
 - `READWISE_TOKEN`: a token from `https://readwise.io/access_token`
 
-The account must have access to Readwise Books. The action reads every library page, merges changes into the source archive, rebuilds the public data, and commits only when it changes. Goodreads RSS is no longer used. CSV import remains available for archive recovery.
+The account must have access to Readwise Books. Each daily run reads the public Goodreads shelf widgets, updates Readwise Books, then fetches the Readwise library and highlights to rebuild the site. Goodreads is authoritative for shelf status and ratings. No Goodreads login cookie or API key is needed; `GOODREADS_USER_ID` is the public profile ID configured in the workflow.
+
+The widget exposes the 100 most recently updated books on each of `currently-reading`, `read`, `did-not-finish`, and `to-read`. This is an incremental feed over the existing imported history, not a complete library export. Changes beyond that window, removals, and private profiles cannot be detected. Goodreads can cache widgets, so changes may take another run to appear. Reading dates and reviews are not supplied and stay unchanged. Paused books remain in the archive because Readwise has no matching shelf.
+
+`_data/goodreads-readwise-matches.json` binds Goodreads review IDs to Readwise Books IDs across title and edition changes. Ambiguous books require an explicit binding; the job reports an error rather than merging sequels or inventing dates. Books absent from the widgets are retained. Goodreads RSS is no longer used. CSV import remains available for archive recovery.
+
+Preview the Goodreads bridge without changing Readwise or local files:
+
+```sh
+GOODREADS_USER_ID=65165202 READWISE_TOKEN="..." node scripts/sync-goodreads-readwise.mjs
+```
+
+Add `--apply` to update Readwise and verify the resulting library. The daily action uses this mode before the existing site sync.
 
 Compare Readwise Books with the archive without changing files:
 

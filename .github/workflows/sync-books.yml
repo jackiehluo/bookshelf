@@ -25,7 +25,10 @@ jobs:
       - name: fetch reading data
         env:
           READWISE_TOKEN: ${{ secrets.READWISE_TOKEN }}
-        run: node scripts/sync-books.mjs
+          GOODREADS_USER_ID: "65165202"
+        run: |
+          node scripts/sync-goodreads-readwise.mjs --apply
+          node scripts/sync-books.mjs
       - name: persist changes
         run: |
           if git diff --quiet -- _data static/data; then
