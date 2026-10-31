@@ -13,11 +13,17 @@ Import a full Goodreads library export once:
 node scripts/sync-books.mjs --replace --goodreads-csv /path/to/goodreads_library_export.csv
 ```
 
-Fetch recent Goodreads changes and Readwise highlights locally:
+Fetch reading metadata from Readwise Books and highlights from Readwise Highlights:
 
 ```sh
-GOODREADS_RSS_URL="..." READWISE_TOKEN="..." node scripts/sync-books.mjs
+READWISE_TOKEN="..." node scripts/sync-books.mjs
 ```
+
+The sync publishes finished, currently reading, and did-not-finish books. Wanted, unsorted, and deleted entries are excluded from new imports. Existing archive entries are retained when absent from those shelves, including paused books, which Readwise Books does not currently support.
+
+Existing book IDs, titles, URLs, covers, highlights, and original dates added are preserved. On the first Readwise Books match, existing ratings and read dates take precedence over imported values. `sourceState.readwiseBooks` records the imported values so subsequent edits in Readwise Books can update ratings and read dates without repeatedly overwriting historical differences. This state stays out of the public catalog.
+
+`_data/readwise-books-matches.json` maps Readwise Books IDs to archive IDs for renamed titles and edition differences. Duplicate entries use the existing linked record, or the record with the most date and rating information on the first sync. Existing highlights identifiers remain separate from Readwise Books identifiers.
 
 All matched Readwise highlights are published by the scheduled sync.
 Readwise Reader PDFs are considered too, even when Readwise categorizes them as articles. Translated or otherwise renamed Reader documents can be mapped to their Goodreads record in `_data/readwise-matches.json`.
@@ -34,13 +40,19 @@ node scripts/sync-books.mjs --build-public-data
 
 ## Automation
 
-The daily GitHub Action needs these repository secrets:
+The daily GitHub Action needs one repository secret:
 
-- `GOODREADS_RSS_URL`: the `#ALL#` Goodreads bookshelf RSS URL
 - `READWISE_TOKEN`: a token from `https://readwise.io/access_token`
 
-The action merges changes into the source archive, rebuilds the public data, and commits only when it changes.
-For existing records, RSS updates ratings, status, and read dates without replacing the original Goodreads `Date Added` value.
+The account must have access to Readwise Books. The action reads every library page, merges changes into the source archive, rebuilds the public data, and commits only when it changes. Goodreads RSS is no longer used. CSV import remains available for archive recovery.
+
+Compare Readwise Books with the archive without changing files:
+
+```sh
+READWISE_TOKEN="..." node scripts/compare-readwise-books.mjs
+```
+
+The comparison checks archive IDs, public URLs, highlights, historical read dates, and repeatability, then lists additions and metadata changes. To repeat the comparison offline, pass a JSON file containing the raw array of Readwise Books entries as the first argument.
 
 ## Local preview
 
