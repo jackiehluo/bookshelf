@@ -34,6 +34,7 @@ test("never confuses a new sequel with a matching title prefix", () => {
   const plan = planGoodreadsSync([sequel], [original], []);
   assert.equal(plan.updates.length + plan.creates.length, 0);
   assert.equal(plan.skipped.length, 1);
+  assert.deepEqual(plan.skipped[0].candidates, [{ id: original.id, title: original.title, author: original.author }]);
 });
 
 test("keeps distinct non-Latin books separate", () => {
