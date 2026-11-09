@@ -36,11 +36,13 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
       }
     }
     if (!target) {
-      const related = library.some((entry) => ["title-author", "title-prefix-author"].includes(
+      const related = library.filter((entry) => ["title-author", "title-prefix-author"].includes(
         bookMatchMethod({ ...entry, title: entry.title || "", author: entry.author || "" }, book),
       ));
-      if (related) {
-        skipped.push({ title: book.title, reason: "title differs from an existing book", reviewId: book.reviewId });
+      if (related.length) {
+        skipped.push({ title: book.title, reason: "title differs from an existing book", reviewId: book.reviewId,
+          candidates: related.map(({ id, title, author }) => ({ id, title, author })),
+        });
         continue;
       }
       creates.push({ source: book, item: {
