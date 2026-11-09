@@ -18,7 +18,20 @@ test("uses saved edition bindings, clears ratings, and leaves absent books alone
   const plan = planGoodreadsSync([source], [{ ...book, rating: 4 }, { ...book, id: 8 }], [], { 99: 7 });
   assert.deepEqual(plan.updates[0].item, { id: 7, status: "currently_reading", rating: null });
   assert.equal(plan.updates.length, 1);
-  assert.throws(() => planGoodreadsSync([source], [], [], { 99: 7 }), /Missing linked/);
+  const missing = planGoodreadsSync([source], [], [], { 99: 7 });
+  assert.equal(missing.skipped[0].reason, "linked Readwise book is missing");
+  assert.equal(missing.creates.length, 0);
+});
+
+test("isolates every conflicting review while planning unrelated updates", () => {
+  const first = { ...source, reviewId: "10" };
+  const second = { ...source, reviewId: "11", status: "finished", rating: 5 };
+  const independent = { ...source, reviewId: "12", title: "Another Book" };
+  const independentBook = { ...book, id: 8, title: "Another Book" };
+  const plan = planGoodreadsSync([first, second, independent], [book, independentBook], [], { 10: 7, 11: 7 });
+  assert.deepEqual(plan.skipped.map(({ reviewId }) => reviewId), ["10", "11"]);
+  assert.deepEqual(plan.updates.map(({ item }) => item), [{ id: 8, status: "currently_reading" }]);
+  assert.equal(plan.creates.length, 0);
 });
 
 test("uses archive bindings for renamed editions and skips ambiguous matches", () => {

@@ -48,7 +48,11 @@ The account must have access to Readwise Books. Each daily run reads the public 
 
 The widget exposes the 100 most recently updated books on each of `currently-reading`, `read`, `did-not-finish`, and `to-read`. This is an incremental feed over the existing imported history, not a complete library export. Changes beyond that window, removals, and private profiles cannot be detected. Goodreads can cache widgets, so changes may take another run to appear. Reading dates and reviews are not supplied and stay unchanged. Paused books remain in the archive because Readwise has no matching shelf.
 
-`_data/goodreads-readwise-matches.json` binds Goodreads review IDs to Readwise Books IDs across title and edition changes. Ambiguous books require an explicit binding; the job reports an error rather than merging sequels or inventing dates. Books absent from the widgets are retained. Goodreads RSS is no longer used. CSV import remains available for archive recovery.
+`_data/goodreads-readwise-matches.json` binds Goodreads review IDs to Readwise Books IDs across title and edition changes. Ambiguous editions, missing linked books, and conflicting reviews are left unchanged while other books continue to sync. No title-prefix match is applied automatically.
+
+`_data/goodreads-sync-issues.json` records unresolved books and possible Readwise matches. The daily run stays successful and shows a warning and a summary with review links and candidate IDs. A warning does not send GitHub's workflow-failure email. Confirm the appropriate review-to-book binding and rerun to resolve a match. The report clears resolved entries when they are observed again, and retains unresolved entries that fall outside the widget's recent-book window. Authentication, malformed responses, API write errors, and failed write verification still fail the job.
+
+Books absent from the widgets are retained. Goodreads RSS is no longer used. CSV import remains available for archive recovery.
 
 Preview the Goodreads bridge without changing Readwise or local files:
 

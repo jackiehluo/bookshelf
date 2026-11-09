@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fetchGoodreadsShelves } from "./goodreads-widget.mjs";
@@ -8,6 +8,7 @@ import { bookMatchMethod } from "./sync-books.mjs";
 
 const root = new URL("../", import.meta.url);
 const statePath = new URL("_data/goodreads-readwise-matches.json", root);
+const issuesPath = new URL("_data/goodreads-sync-issues.json", root);
 const normalize = (s) => (s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const titleKey = (s) => normalize((s || "").replace(/(?:\s*\([^()]*\)\s*)+$/, ""));
@@ -19,10 +20,16 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
   const matches = { ...savedMatches };
   const updates = [], creates = [], skipped = [];
   const byId = new Map(library.map((book) => [String(book.id), book]));
-  const claimed = new Map();
+  const groups = new Map();
+  const skip = (book, reason, candidates) => skipped.push({ ...book, reason,
+    candidates: candidates.map(({ id, title, author }) => ({ id, title, author })),
+  });
   for (const book of source) {
     let target = byId.get(String(matches[book.reviewId]));
-    if (matches[book.reviewId] && !target) throw new Error(`Missing linked Readwise book for ${book.title}.`);
+    if (matches[book.reviewId] && !target) {
+      skip(book, "linked Readwise book is missing", library.filter((entry) => sameBook(entry, book)));
+      continue;
+    }
     if (!target) {
       const linked = archive.filter((entry) => sameBook(entry, book) && entry.identifiers?.readwiseBooks);
       const candidates = library.filter((entry) => sameBook(entry, book));
@@ -31,7 +38,7 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
       if (preferred.length === 1) target = preferred[0];
       else if (candidates.length === 1) target = candidates[0];
       else if (candidates.length > 1) {
-        skipped.push({ title: book.title, reason: "ambiguous editions", reviewId: book.reviewId });
+        skip(book, "ambiguous editions", candidates);
         continue;
       }
     }
@@ -40,9 +47,7 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
         bookMatchMethod({ ...entry, title: entry.title || "", author: entry.author || "" }, book),
       ));
       if (related.length) {
-        skipped.push({ title: book.title, reason: "title differs from an existing book", reviewId: book.reviewId,
-          candidates: related.map(({ id, title, author }) => ({ id, title, author })),
-        });
+        skip(book, "title differs from an existing book", related);
         continue;
       }
       creates.push({ source: book, item: {
@@ -51,8 +56,15 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
       } });
       continue;
     }
-    if (claimed.has(target.id)) throw new Error(`Multiple Goodreads reviews match Readwise book ${target.id}.`);
-    claimed.set(target.id, book.reviewId);
+    if (!groups.has(target.id)) groups.set(target.id, []);
+    groups.get(target.id).push({ book, target });
+  }
+  for (const group of groups.values()) {
+    if (group.length > 1) {
+      for (const { book, target } of group) skip(book, "multiple Goodreads reviews match the same Readwise book", [target]);
+      continue;
+    }
+    const [{ book, target }] = group;
     matches[book.reviewId] = target.id;
     const item = { id: target.id };
     if (target.status !== book.status) item.status = book.status;
@@ -60,6 +72,34 @@ export const planGoodreadsSync = (source, library, archive, savedMatches = {}) =
     if (Object.keys(item).length > 1) updates.push({ title: book.title, item });
   }
   return { matches, updates, creates, skipped };
+};
+
+const writeJson = async (location, data) => {
+  const temporary = new URL(`${location.href}.tmp`);
+  await writeFile(temporary, `${JSON.stringify(data, null, 2)}\n`);
+  await rename(temporary, location);
+};
+
+const reportIssues = async (source, { skipped, updates, creates }, previous) => {
+  const observed = new Set(source.map(({ reviewId }) => reviewId));
+  const pending = [...previous.filter(({ reviewId }) => !observed.has(reviewId)), ...skipped]
+    .sort((left, right) => left.reviewId.localeCompare(right.reviewId));
+  await writeJson(issuesPath, pending);
+  const message = `Verified ${updates.length} updates and ${creates.length} additions; ${pending.length} books need matching.`;
+  console.log(message);
+  if (pending.length) {
+    const warning = `${pending.length} Goodreads books were left unchanged. See _data/goodreads-sync-issues.json and add confirmed IDs to _data/goodreads-readwise-matches.json.`;
+    console.warn(process.env.GITHUB_ACTIONS === "true" ? `::warning title=Books need matching::${warning}` : warning);
+  }
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const escape = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/[\\|\[\]`]/g, "\\$&").replace(/[\r\n]+/g, " ");
+    const rows = pending.map((book) => `| [${escape(book.title)}](https://www.goodreads.com/review/show/${book.reviewId}) | ${escape(book.reason)} | ${escape(book.candidates.map(({ id, title, author }) => `${id}: ${title} by ${author}`).join("; "))} |`);
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, [
+      "## Goodreads sync", "", message, "",
+      ...(pending.length ? ["These books stay unchanged while the rest of the library syncs. Confirm a candidate in `_data/goodreads-readwise-matches.json` and rerun.", "", "| Goodreads book | Reason | Possible Readwise matches |", "| --- | --- | --- |", ...rows, ""] : []),
+    ].join("\n"));
+  }
 };
 
 const mutateBooks = async (token, method, items) => {
@@ -98,23 +138,21 @@ const main = async () => {
   const library = await fetchReadwiseBooks(token);
   const archive = JSON.parse(await readFile(new URL("_data/books.json", root), "utf8")).books;
   const savedMatches = JSON.parse(await readFile(statePath, "utf8"));
+  const previousIssues = JSON.parse(await readFile(issuesPath, "utf8"));
   const plan = planGoodreadsSync(source, library, archive, savedMatches);
   console.log(JSON.stringify({ updates: plan.updates, creates: plan.creates.map(({ source }) => source.title), skipped: plan.skipped }, null, 2));
   if (!process.argv.includes("--apply")) {
     console.log("Dry run only. Pass --apply to update Readwise Books.");
     return;
   }
-  if (plan.skipped.length) throw new Error(`${plan.skipped.length} Goodreads books need explicit edition matches.`);
-  await applyGoodreadsSync(plan, token, async (matches) => {
-    const content = `${JSON.stringify(matches, null, 2)}\n`;
-    const temporary = new URL(`${statePath.href}.tmp`);
-    await writeFile(temporary, content);
-    await rename(temporary, statePath);
-  });
+  await applyGoodreadsSync(plan, token, (matches) => writeJson(statePath, matches));
   const next = await fetchReadwiseBooks(token);
-  const repeated = planGoodreadsSync(source, next, archive, plan.matches);
-  assert.equal(repeated.updates.length + repeated.creates.length, 0, "Readwise Books did not converge after sync.");
-  console.log(`Verified ${plan.updates.length} updates and ${plan.creates.length} additions in Readwise Books.`);
+  const unresolved = new Set(plan.skipped.map(({ reviewId }) => reviewId));
+  const attempted = source.filter(({ reviewId }) => !unresolved.has(reviewId));
+  const repeated = planGoodreadsSync(attempted, next, archive, plan.matches);
+  assert.equal(repeated.updates.length + repeated.creates.length + repeated.skipped.length, 0,
+    "Readwise Books did not converge after sync.");
+  await reportIssues(source, plan, previousIssues);
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
