@@ -98,7 +98,6 @@ try {
     highlights = (await highlightsResponse.json()).highlights || [];
   }
 
-  document.title = `${book.title} | Jackie Luo`;
   page.setAttribute("aria-busy", "false");
   render(book, highlights);
 } catch (error) {
